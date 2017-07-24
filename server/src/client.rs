@@ -60,8 +60,8 @@ impl Service for Client {
 }
 
 impl Client {
-    pub fn connect(addr: &net::SocketAddr, handle: &Handle) -> Box<Future<Item = Client, Error = io::Error>> {
-        let ret = TcpClient::new(Proto::new_client())
+    pub fn connect(addr: &net::SocketAddr, handle: &Handle, server_public_key: Vec<u8>) -> Box<Future<Item = Client, Error = io::Error>> {
+        let ret = TcpClient::new(Proto::new_client(server_public_key.clone()))
             .connect(addr, handle)
             .map(|service| {
                 let s = RPC { inner: service };
