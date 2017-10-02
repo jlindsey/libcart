@@ -3,6 +3,7 @@ extern crate log;
 extern crate base64;
 extern crate ring;
 extern crate untrusted;
+extern crate pem;
 
 pub mod errors;
 pub mod keys;

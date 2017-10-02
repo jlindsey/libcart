@@ -1,18 +1,42 @@
 use std::fs::File;
 use std::io::prelude::*;
 
+use ::pem;
 use ::ring::{rand, signature};
 use ::base64::{encode, decode};
 use ::untrusted;
 
 use errors::Error;
 
+pub fn create_signing_keypair(filename: &str) -> Result<(), Error> {
+    let key = gen_key_bytes()?;
+    let p = pem::Pem {
+        tag: String::from("PRIVATE KEY"),
+        contents: key.to_vec()
+    };
+
+    let encoded = pem::encode(&p);
+    write_key_file(&encoded, &format!("{}.key", filename))?;
+
+    let key = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&key))?;
+    let pubkey = key.public_key_bytes();
+    let p = pem::Pem {
+        tag: String::from("PUBLIC KEY"),
+        contents: pubkey.to_vec()
+    };
+    let encoded = pem::encode(&p);
+    write_key_file(&encoded, &format!("{}.pub", filename))?;
+
+    Ok(())
+}
+
 pub fn load_or_create_key(path: &str) -> Result<signature::Ed25519KeyPair, Error> {
     let pair = load_key(path);
 
     match pair {
         Ok(key) => Ok(key),
-        Err(Error::IOError(_)) => {
+        Err(Error::IOError(ref err)) => {
+            debug!("Got IOError: {}, generating new key", err);
             let key = gen_key_bytes()?;
             let encoded = encode(&key[..]);
             write_key_file(&encoded, path)?;
@@ -41,6 +65,7 @@ fn write_key_file(key: &str, filename: &str) -> Result<(), Error> {
 }
 
 fn load_key(path: &str) -> Result<signature::Ed25519KeyPair, Error> {
+    debug!("Attempting to load server key: {}", path);
     let mut f = File::open(path)?;
     let mut buf = Vec::new();
 
@@ -51,6 +76,7 @@ fn load_key(path: &str) -> Result<signature::Ed25519KeyPair, Error> {
     der_bytes.clone_from_slice(&decoded);
 
     let pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&der_bytes))?;
+    debug!("Got server key: {:?}", pair.public_key_bytes());
 
     Ok(pair)
 }
